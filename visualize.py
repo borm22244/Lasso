@@ -51,40 +51,55 @@ for i in range(B1.shape[0]):
     for j in range(B1.shape[1]):
         Z[i, j] = lasso_obj(np.array([B1[i, j], B2[i, j]]))
 
-# ----- Static 3D surface + path -----
+# ----- Static 3D surface + path (improved visibility) -----
+eps = 0.02 * (Z.max() - Z.min())  # small z-offset to lift the path above surface
+
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, projection="3d")
-ax.plot_surface(B1, B2, Z, linewidth=0, antialiased=True, alpha=0.8)
-ax.plot3D(steps[:,0], steps[:,1], Z_path, marker="o")
+ax.plot_surface(B1, B2, Z, linewidth=0, antialiased=True, alpha=0.35)  # more transparent
+ax.plot3D(steps[:,0], steps[:,1], Z_path + eps, marker="o", linewidth=2, markersize=5)
+# helpful projection on the bottom plane
+ax.contour(B1, B2, Z, 20, zdir='z', offset=Z.min(), linewidths=0.8, alpha=0.5)
+
 ax.set_title("LASSO Objective Surface + Subgradient Descent Path (3D)")
 ax.set_xlabel(r"$\beta_1$")
 ax.set_ylabel(r"$\beta_2$")
 ax.set_zlabel("Objective")
-ax.view_init(elev=28, azim=-55)
+ax.view_init(elev=32, azim=-40)  # tweak the view so points pop out
 plt.tight_layout()
 plt.savefig("lasso_3d_surface_path.png", dpi=180)
 plt.show()
 
-# ----- Animation: path growing -----
+# ----- Animation: path growing (improved visibility) -----
 fig2 = plt.figure(figsize=(8, 6))
 ax2 = fig2.add_subplot(111, projection="3d")
-ax2.plot_surface(B1, B2, Z, linewidth=0, antialiased=True, alpha=0.75)
-line, = ax2.plot([], [], [], marker="o")
+ax2.plot_surface(B1, B2, Z, linewidth=0, antialiased=True, alpha=0.35)
+line, = ax2.plot([], [], [], marker="o", linewidth=2, markersize=5)
+pt = ax2.scatter([], [], [], s=40)  # current point as a bigger dot
 ax2.set_title("Subgradient Descent on LASSO Surface (3D Animation)")
 ax2.set_xlabel(r"$\beta_1$")
 ax2.set_ylabel(r"$\beta_2$")
 ax2.set_zlabel("Objective")
-ax2.view_init(elev=28, azim=-55)
+ax2.view_init(elev=32, azim=-40)
 
 def init():
     line.set_data([], [])
     line.set_3d_properties([])
-    return (line,)
+    # init current point
+    pt._offsets3d = ([], [], [])
+    return (line, pt)
 
 def update(frame):
     line.set_data(steps[:frame,0], steps[:frame,1])
-    line.set_3d_properties(Z_path[:frame])
-    return (line,)
+    line.set_3d_properties(Z_path[:frame] + eps)
+
+    # update current point
+    if frame > 0:
+        b1v = steps[frame-1, 0]
+        b2v = steps[frame-1, 1]
+        zv  = Z_path[frame-1] + eps
+        pt._offsets3d = ([b1v], [b2v], [zv])
+    return (line, pt)
 
 ani = animation.FuncAnimation(fig2, update, init_func=init,
                               frames=len(steps), interval=120, blit=True)
